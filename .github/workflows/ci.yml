@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+  build:
+    name: Build Workspace
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Restore Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          cache-targets: true
+
+      - name: Build all targets
+        run: cargo build --workspace --all-targets --locked
+
+  test:
+    name: Test (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    needs:
+      - build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: core
+            command: cargo test --locked -p domain -p observability -p gateway -p mcp -p skills -p outbound
+          - shard: storage-tools
+            command: cargo test --locked -p storage -p tools
+          - shard: agent-api
+            command: cargo test --locked -p agent -p api
+          - shard: bridge
+            command: cargo test --locked -p employee-bridge -p eval-harness
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Restore Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          cache-targets: true
+
+      - name: Run shard
+        run: ${{ matrix.command }}
