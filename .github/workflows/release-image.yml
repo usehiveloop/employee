@@ -1,6 +1,9 @@
 name: Release Docker Image
 
 on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
   release:
     types:
       - published
@@ -49,7 +52,15 @@ jobs:
           if [[ "$semver" != "$tag" ]]; then
             tags="${tags},${IMAGE_NAME}:${semver}"
           fi
-          if [[ "${{ github.event.release.prerelease }}" != "true" ]]; then
+
+          prerelease="false"
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            prerelease="${{ github.event.release.prerelease }}"
+          elif [[ "$semver" == *"-"* ]]; then
+            prerelease="true"
+          fi
+
+          if [[ "$prerelease" != "true" ]]; then
             tags="${tags},${IMAGE_NAME}:latest"
           fi
 
